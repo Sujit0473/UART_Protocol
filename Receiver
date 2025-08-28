@@ -1,0 +1,80 @@
+module uart_rx#(parameter clk_freq = 1000000,
+                parameter baud_rate = 9600)
+                
+   (
+    input clk, 
+    input rst, 
+    input rx,
+    output reg done,    // High when data recieving is done
+    output reg [7:0] rxdata  //recieved data
+    );
+    
+    // The number of system clock cycles
+    localparam clk_count = clk_freq/baud_rate;
+    
+    //variables consideration 
+    integer count = 0;
+    integer counts = 0;
+    reg uclk = 0;
+    
+    localparam IDLE = 2'b00;
+    localparam START = 2'b01;
+    reg [1:0] state = IDLE;
+    
+    //Clock Generation 
+    always@(posedge clk)
+        begin
+            if(count <= clk_count/2)
+                begin
+                    count <= count +1;
+                end
+                
+            else begin
+                    count <= 0;
+                    uclk <= ~uclk;
+                 end
+        end
+        
+    //UART Reciever Logic 
+     always @(posedge uclk or posedge rst)
+begin
+    if (rst)
+    begin
+        rxdata <= 8'h00;
+        done <= 1'b0;
+        counts <= 0;
+        state <= IDLE;
+    end
+    else
+    begin
+        case (state)
+            IDLE: begin
+                rxdata <= 8'h00;
+                counts <= 0;
+                done <= 1'b0;
+
+                if (rx == 1'b0)
+                    state <= START;
+            end
+
+            START: begin
+                if (counts <= 7)
+                begin
+                    rxdata <= {rx, rxdata[7:1]};
+                    counts <= counts + 1;
+                end
+                else
+                begin
+                    counts <= 0;
+                    done <= 1'b1;
+                    state <= IDLE;
+                end
+            end
+
+            default: begin
+                state <= IDLE;
+            end
+        endcase
+    end
+end    
+endmodule
