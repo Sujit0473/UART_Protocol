@@ -1,0 +1,91 @@
+module uart_tx #(parameter clk_freq = 1000000,
+                parameter baud_rate = 9600)
+                
+    (
+    input clk, 
+    input newd, // Whenever new data comes, it gets high
+    input rst,
+    input [7:0] tx_data,
+    output reg donetx,
+    output reg tx    // UART bitwise sending output
+    );
+    
+    localparam clkcount = clk_freq / baud_rate;
+    
+    // Variables for clock division 
+    integer count = 0;   // Enough bits for clkcount value
+    integer  counts = 0;   // 4 bits for 0 to 7 counting
+    reg uclk = 0;           // Internal UART clk 
+    
+    // Internal data register to hold data for further transmission 
+    reg [7:0] din;
+    
+    // UART State Machine 
+    reg [1:0] state;
+    localparam IDLE  = 2'b00;
+    localparam TRANSFER = 2'b10;
+    
+    // UART Clock Generator 
+    always@(posedge clk)
+    begin
+        if (rst) begin
+            count <= 0;
+            uclk <= 0;
+        end
+        else if(count < clkcount / 2)
+            count <= count + 1;   
+        else 
+        begin
+            count <= 0;
+            uclk <= ~uclk;    // Toggle UART Clock Cycle
+        end       
+    end
+    
+    // UART Transmitter Logic 
+    always@(posedge uclk)
+    begin
+        if(rst)
+        begin
+            state   <= IDLE;
+            tx      <= 1'b1;
+            donetx  <= 1'b0;
+            counts  <= 0;
+        end
+        else
+        begin
+            case(state)
+                IDLE: begin
+                    counts  <= 0;
+                    tx      <= 1'b1;
+                    donetx  <= 1'b0;
+
+                    if(newd)
+                    begin
+                        state   <= TRANSFER;
+                        din     <= tx_data;
+                        tx      <= 1'b0;
+                    end
+                end
+                
+                // Send data bits [LSB to MSB]
+                TRANSFER: begin
+                    if(counts <= 7) begin
+                        tx <= din[counts];
+                        counts <= counts + 1;
+                    end
+                    else begin
+                        tx <= 1'b1;
+                        state <= IDLE;
+                        donetx <= 1'b1;
+                        counts <= 0;
+                    end
+                end 
+                
+                default: begin
+                    state <= IDLE;
+                end
+            endcase
+        end
+    end
+
+endmodule
