@@ -1,0 +1,19 @@
+module uart_top#(parameter clk_freq = 1000000,
+                  parameter baud_rate = 9600)
+    (
+    input clk, rst, rx,
+    input newd,
+    input [7:0] dintx,
+    output donerx, 
+    output donetx,
+    output tx,
+    output [7:0] doutrx
+    );
+    
+    
+    uart_tx #(clk_freq,baud_rate) utx(.clk(clk), .rst(rst), .newd(newd), .tx_data(dintx), .tx(tx), .donetx(donetx));
+    
+    uart_rx #(clk_freq,baud_rate) urx(.clk(clk), .rst(rst), .rx(rx), .done(donerx), .rxdata(doutrx));
+    
+    
+endmodule
