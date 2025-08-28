@@ -1,0 +1,75 @@
+module uart_tb;
+
+  // Testbench signals
+  reg clk = 0, rst = 0;
+  reg rx = 1;
+  reg [7:0] dintx;
+  reg newd;
+
+  wire tx;
+  wire [7:0] doutrx;
+  wire donetx, donerx;
+
+  // Instantiate UART Top Module
+  uart_top #(1000000, 9600) dut (
+    .clk(clk),
+    .rst(rst),
+    .rx(rx),
+    .dintx(dintx),
+    .newd(newd),
+    .tx(tx),
+    .doutrx(doutrx),
+    .donetx(donetx),
+    .donerx(donerx)
+  );
+
+  // Clock generation: 1 MHz => 1 us period => toggle every 0.5 us
+  always #5 clk = ~clk;
+
+  // Data storage for TX and RX
+  reg [7:0] tx_data;
+  reg [7:0] rx_data;
+  integer j;
+
+  initial begin
+    tx_data = 8'd0;
+    rx_data = 8'd0;
+
+    // Reset sequence
+    rst = 1;
+    repeat (5) @(posedge clk);
+    rst = 0;
+
+    // Transmit
+    newd = 1;
+    dintx = $urandom;
+
+    // Wait for transmission to start (tx goes low)
+    wait (tx == 0);
+    @(posedge dut.utx.uclk);
+
+    // Sample 8 bits during transmission
+    for (j = 0; j < 8; j = j + 1) begin
+      @(posedge dut.utx.uclk);
+      tx_data = {tx, tx_data[7:1]};
+    end
+
+    @(posedge donetx);
+    newd = 0;
+
+    // Send start bit
+    rx = 1'b0;
+    @(posedge dut.utx.uclk);
+
+    // Send 8 data bits
+    for (j = 0; j < 8; j = j + 1) begin
+      if (j != 0) @(posedge dut.utx.uclk);
+      rx = ~rx; // Generating 01010101
+      rx_data = {rx, rx_data[7:1]};
+    end
+
+    @(posedge donerx);
+    $finish;
+  end
+
+endmodule
